@@ -55,9 +55,16 @@ namespace Ethiom101
 				__instance.Weapon.ToggleFireSelector(); // Switch from Safe to Fire (we verified we're on safe already above)
 		}
 
+		[HarmonyReversePatch]
+		[HarmonyPatch(typeof(FVRInteractiveObject), "FVRUpdate")]
+		public static void OvrrideFVRUpdate(object instance)
+		{
+
+		}
+
 		[HarmonyPatch(typeof(ClosedBoltForeHandle), "FVRUpdate")]
 		[HarmonyPrefix]
-		public static void LockUnlockPump(ClosedBoltForeHandle __instance)
+		public static bool LockUnlockPump(ClosedBoltForeHandle __instance)
 		{
 			// Are we a SPAS-15?
 			switch (__instance.Weapon.ObjectWrapper.ItemID)
@@ -67,29 +74,65 @@ namespace Ethiom101
 				case "SPAS15Tactical":
 					break;
 				default:
-					return;
+					return true;
 			}
+
+			OvrrideFVRUpdate(__instance);
 
 			if (__instance.IsHeld && __instance.Mode == ClosedBoltForeHandle.ForeHandleMode.Racking)
 			{
 				Vector3 closestValidPoint = __instance.GetClosestValidPoint(__instance.ForeHandlePoint_Forward.position, __instance.ForeHandlePoint_Rear.position, __instance.m_hand.Input.Pos);
 				Vector3 vector = __instance.Weapon.transform.InverseTransformPoint(closestValidPoint);
 				float num = Mathf.InverseLerp(__instance.ForeHandlePoint_Forward.localPosition.z, __instance.ForeHandlePoint_Rear.localPosition.z, vector.z);
-				
-				// When Operating the pump, switching from fire to safe unlocks the action
 				if (__instance.Pos == ClosedBoltForeHandle.ForeHandlePos.Forward && num > 0.7f && __instance.Weapon.IsWeaponOnSafe())
 				{
 					__instance.m_tarPos = ClosedBoltForeHandle.ForeHandlePos.Rear;
 				}
-
-				// The SPAS-15 has a bolt hold open which locks the bolt (and the pump grip) to the rear
 				else if (__instance.Pos == ClosedBoltForeHandle.ForeHandlePos.Rear && num < 0.3f && __instance.Weapon.Magazine != null && __instance.Weapon.Magazine.HasARound())
 				{
 					__instance.m_tarPos = ClosedBoltForeHandle.ForeHandlePos.Forward;
 				}
-
-
 			}
+			if (__instance.Mode == ClosedBoltForeHandle.ForeHandleMode.Racking)
+			{
+				if (__instance.m_tarPos == ClosedBoltForeHandle.ForeHandlePos.Rear && __instance.Pos != ClosedBoltForeHandle.ForeHandlePos.Rear)
+				{
+					__instance.posLerp += Time.deltaTime * 20f;
+					__instance.transform.localPosition = Vector3.Lerp(__instance.ForeHandlePoint_Forward.localPosition, __instance.ForeHandlePoint_Rear.localPosition, __instance.posLerp);
+					if (__instance.posLerp >= 1f)
+					{
+						__instance.posLerp = 1f;
+						__instance.ArriveAtRear();
+					}
+					else
+					{
+						__instance.Pos = ClosedBoltForeHandle.ForeHandlePos.Mid;
+					}
+				}
+				else if (__instance.m_tarPos == ClosedBoltForeHandle.ForeHandlePos.Forward && __instance.Pos != ClosedBoltForeHandle.ForeHandlePos.Forward)
+				{
+					__instance.posLerp -= Time.deltaTime * 20f;
+					__instance.transform.localPosition = Vector3.Lerp(__instance.ForeHandlePoint_Forward.localPosition, __instance.ForeHandlePoint_Rear.localPosition, __instance.posLerp);
+					if (__instance.posLerp <= 0f)
+					{
+						__instance.posLerp = 0f;
+						__instance.ArriveAtFront();
+					}
+					else
+					{
+						__instance.Pos = ClosedBoltForeHandle.ForeHandlePos.Mid;
+					}
+				}
+			}
+			bool flag = false;
+			if (__instance.Mode == ClosedBoltForeHandle.ForeHandleMode.Racking)
+			{
+				flag = true;
+			}
+			float num2 = Mathf.InverseLerp(__instance.ForeHandlePoint_Forward.localPosition.z, __instance.ForeHandlePoint_Rear.localPosition.z, __instance.transform.localPosition.z);
+			__instance.Weapon.Bolt.UpdateHandleHeldState(flag, num2);
+
+			return false;
 		}
 
 		[HarmonyPatch(typeof(ClosedBoltWeapon), "Fire")]
