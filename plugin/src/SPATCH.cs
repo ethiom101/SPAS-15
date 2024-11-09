@@ -9,12 +9,11 @@ using FistVR;
 
 namespace Ethiom101
 {
-	[HarmonyPatch(typeof(ClosedBolt))]
 	static public class SPATCH
 	{
-		[HarmonyPatch("UpdateBolt")]
+		[HarmonyPatch(typeof(ClosedBolt), "UpdateBolt")]
 		[HarmonyPostfix]
-		static public void OverrrideSafety(ClosedBolt __instance)
+		public static void OverrrideSafety(ClosedBolt __instance)
 		{
 			// Are we a SPAS-15?
 			switch (__instance.Weapon.ObjectWrapper.ItemID)
@@ -34,8 +33,32 @@ namespace Ethiom101
 			// Check to see if the bolt has traveled at least half way
 			float boltTravel = Vector3.Distance(__instance.Point_Bolt_Forward.position, __instance.Point_Bolt_Rear.position);
 			float currentBoltPos = Vector3.Distance(__instance.Point_Bolt_Forward.position, __instance.transform.position);
-			if(currentBoltPos/boltTravel >= 0.5)
+			if (currentBoltPos / boltTravel >= 0.5)
 				__instance.Weapon.ToggleFireSelector(); // Switch from Safe to Fire (we verified we're on safe already above)
+		}
+
+		[HarmonyPatch(typeof(ClosedBoltForeHandle), "FVRUpdate")]
+		[HarmonyPrefix]
+		public static void UnlockPump(ClosedBoltForeHandle __instance)
+		{
+			// Are we a SPAS-15?
+			switch (__instance.Weapon.ObjectWrapper.ItemID)
+			{
+				case "SPAS15":
+				case "SPAS15Compact":
+				case "SPAS15Tactical":
+					break;
+				default:
+					return;
+			}
+
+			Vector3 closestValidPoint = __instance.GetClosestValidPoint(__instance.ForeHandlePoint_Forward.position, __instance.ForeHandlePoint_Rear.position, __instance.m_hand.Input.Pos);
+			Vector3 vector = __instance.Weapon.transform.InverseTransformPoint(closestValidPoint);
+			float num = Mathf.InverseLerp(__instance.ForeHandlePoint_Forward.localPosition.z, __instance.ForeHandlePoint_Rear.localPosition.z, vector.z);
+			if (__instance.Pos == ClosedBoltForeHandle.ForeHandlePos.Forward && num > 0.7f && __instance.Weapon.FireSelector_Modes[__instance.Weapon.m_fireSelectorMode].ModeType == ClosedBoltWeapon.FireSelectorModeType.Safe)
+			{
+				__instance.m_tarPos = ClosedBoltForeHandle.ForeHandlePos.Rear;
+			}
 		}
 	}
 }
