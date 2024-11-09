@@ -1,13 +1,12 @@
 ﻿using BepInEx;
 using BepInEx.Logging;
+using HarmonyLib;
 
-// TODO: Change 'YourName' to your name. 
-namespace YourName
+namespace Ethiom101
 {
-    // TODO: Change 'YourPlugin' to the name of your plugin
-    [BepInAutoPlugin]
-    [BepInProcess("h3vr.exe")]
-    public partial class YourPlugin : BaseUnityPlugin
+	[BepInPlugin("h3vr.SPATCH", "SPATCH", "0.0.1")]
+	[BepInProcess("h3vr.exe")]
+    public partial class SPAS15Fix : BaseUnityPlugin
     {
         /* == Quick Start == 
          * Your plugin class is a Unity MonoBehaviour that gets added to a global game object when the game starts.
@@ -26,7 +25,9 @@ namespace YourName
             Logger = base.Logger;
             
             // Your plugin's ID, Name, and Version are available here.
-            Logger.LogMessage($"Hello, world! Sent from {Id} {Name} {Version}");
+            Logger.LogMessage($"Hey guys. Thanks for tuning in to another video on Forgotten Weapons dot com. I'm Ethiom101 and today we're fixing behaviour on the SPAS-15.");
+
+            Harmony.CreateAndPatchAll( typeof( SPATCH ) );
         }
         
         // The line below allows access to your plugin's logger from anywhere in your code, including outside of this file.
