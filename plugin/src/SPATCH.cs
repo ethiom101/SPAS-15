@@ -11,6 +11,24 @@ namespace Ethiom101
 {
 	static public class SPATCH
 	{
+		[HarmonyPatch(typeof(ClosedBolt), "Awake")]
+		[HarmonyPostfix]
+		public static void EnableBoltHoldOpen(ClosedBolt __instance)
+		{
+			// Are we a SPAS-15?
+			switch (__instance.Weapon.ObjectWrapper.ItemID)
+			{
+				case "SPAS15":
+				case "SPAS15Compact":
+				case "SPAS15Tactical":
+					break;
+				default:
+					return;
+			}
+
+			__instance.HasLastRoundBoltHoldOpen = true;
+		}
+
 		[HarmonyPatch(typeof(ClosedBolt), "UpdateBolt")]
 		[HarmonyPostfix]
 		public static void OverrrideSafety(ClosedBolt __instance)
@@ -39,7 +57,7 @@ namespace Ethiom101
 
 		[HarmonyPatch(typeof(ClosedBoltForeHandle), "FVRUpdate")]
 		[HarmonyPrefix]
-		public static void UnlockPump(ClosedBoltForeHandle __instance)
+		public static void LockUnlockPump(ClosedBoltForeHandle __instance)
 		{
 			// Are we a SPAS-15?
 			switch (__instance.Weapon.ObjectWrapper.ItemID)
@@ -57,12 +75,42 @@ namespace Ethiom101
 				Vector3 closestValidPoint = __instance.GetClosestValidPoint(__instance.ForeHandlePoint_Forward.position, __instance.ForeHandlePoint_Rear.position, __instance.m_hand.Input.Pos);
 				Vector3 vector = __instance.Weapon.transform.InverseTransformPoint(closestValidPoint);
 				float num = Mathf.InverseLerp(__instance.ForeHandlePoint_Forward.localPosition.z, __instance.ForeHandlePoint_Rear.localPosition.z, vector.z);
+				
+				// When Operating the pump, switching from fire to safe unlocks the action
 				if (__instance.Pos == ClosedBoltForeHandle.ForeHandlePos.Forward && num > 0.7f && __instance.Weapon.IsWeaponOnSafe())
 				{
 					__instance.m_tarPos = ClosedBoltForeHandle.ForeHandlePos.Rear;
 				}
+
+				// The SPAS-15 has a bolt hold open which locks the bolt (and the pump grip) to the rear
+				else if (__instance.Pos == ClosedBoltForeHandle.ForeHandlePos.Rear && num < 0.3f && __instance.Weapon.Magazine != null && __instance.Weapon.Magazine.HasARound())
+				{
+					__instance.m_tarPos = ClosedBoltForeHandle.ForeHandlePos.Forward;
+				}
+
+
 			}
 		}
+
+		[HarmonyPatch(typeof(ClosedBoltWeapon), "Fire")]
+		[HarmonyPostfix]
+		public static void SafeWhenFire(ClosedBoltWeapon __instance)
+		{
+			// Are we a SPAS-15?
+			switch (__instance.ObjectWrapper.ItemID)
+			{
+				case "SPAS15":
+				case "SPAS15Compact":
+				case "SPAS15Tactical":
+					break;
+				default:
+					return;
+			}
+
+			// A SPAS-15 can only be fired when toggled to fire so
+			__instance.ToggleFireSelector(); // Switch to safe
+		}
+
 
 		//[HarmonyPatch(typeof(ClosedBolt), "UpdateBolt")]
 		//[HarmonyPostfix]
@@ -83,8 +131,7 @@ namespace Ethiom101
 		//	if (__instance.Weapon.IsWeaponOnSafe())
 		//		return;
 
-		//	// Switching the gun from fire to safe will unlock the bolt allowing it to be cycled freely
-		//	__instance.ReleaseBolt();
+		//	// TODO - Unlock the bolt
 		//}
 
 		//[HarmonyPatch(typeof(ClosedBoltWeapon), "Fire")]
@@ -103,15 +150,15 @@ namespace Ethiom101
 		//	}
 
 		//	// When action has been cycled the bolt is locked, firing the gun will unlock the bolt
-		//	__instance.Bolt.ReleaseBolt();
+		//	// TODO - Unlock the bolt
 		//}
 
-		//[HarmonyPatch(typeof(ClosedBoltWeapon), "ChamberRound")]
+		//[HarmonyPatch(typeof(ClosedBolt), "BoltEvent_ArriveAtFore")]
 		//[HarmonyPostfix]
-		//public static void LockBoltWhenChamberRound(ClosedBoltWeapon __instance)
+		//public static void LockBoltWhenChamberRound(ClosedBolt __instance)
 		//{
 		//	// Are we a SPAS-15?
-		//	switch (__instance.ObjectWrapper.ItemID)
+		//	switch (__instance.Weapon.ObjectWrapper.ItemID)
 		//	{
 		//		case "SPAS15":
 		//		case "SPAS15Compact":
@@ -121,8 +168,8 @@ namespace Ethiom101
 		//			return;
 		//	}
 
-		//	if(!__instance.IsWeaponOnSafe()) // If the gun is on fire when the round is chambered (they may drop the bolt slowly and engage the safety part way)
-		//		__instance.Bolt.LockBolt();
+		//	//if (!__instance.Weapon.IsWeaponOnSafe()) // If the gun is on fire when the round is chambered (they may drop the bolt slowly and engage the safety part way)
+
 		//}
 	}
 }
